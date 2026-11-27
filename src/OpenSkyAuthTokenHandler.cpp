@@ -20,6 +20,8 @@ String OpenSkyAuthTokenHandler::FetchBearerToken(const String& url, const String
         Serial.println(resp.errorMessage);
         return "";
     }
+    Serial.println(clientId);
+    Serial.println(clientSecret);
 
     JsonDocument doc;
     DeserializationError error = deserializeJson(doc, resp.response);

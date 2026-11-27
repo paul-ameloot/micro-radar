@@ -140,13 +140,30 @@ std::pair<int, int> AircraftManager::ProjectCoordinateToScreen(float predLat, fl
 
 void AircraftManager::DrawAircraftInfo(LGFX_Sprite& backbuffer, int x, int y, const TrackedAircraft& tracked) const
 {
-    const int lineHeight = tft.fontHeight() + 1;
+    const int lineHeight = tft.fontHeight() + 0.5;
+    const int spaceX = 3;
 
     backbuffer.setTextSize(1);
-    backbuffer.setTextColor(lgfx::color888(0, 128, 0));
-    backbuffer.drawString(tracked.state.callsign, x + 5, y + 5);
-    backbuffer.drawString(String(tracked.state.velocity) + "m/s", x + 5, y + 5 + lineHeight);
-    backbuffer.drawString(String(tracked.state.baroAltitude) + "m", x + 5, y + 5 + lineHeight * 2);
+    backbuffer.setTextColor(lgfx::color888(200,0,0));
+
+    backbuffer.drawString(tracked.state.callsign, x + 5 + spaceX, y + 5 - lineHeight * 2);
+    backbuffer.drawString(tracked.state.squawk, x + 5 + spaceX, y + 5 - lineHeight * 1);
+    backbuffer.drawString(String(int(tracked.state.velocity * 3.6)) + "km/h", x + 5 + spaceX, y + 5 + lineHeight * 0);
+
+    // Convert barometric altitude from meters to feet and display it
+    // Display FL (Flight Level) if altitude is 6000 feet or higher
+    if (tracked.state.baroAltitude*3.28084 >= 6000 && tracked.state.baroAltitude*3.28084 <= 9999) {
+        backbuffer.setTextColor(lgfx::color888(0, 80, 200));
+        backbuffer.drawString("FL0" + String(int(((int(tracked.state.baroAltitude*3.28084) + 999) / 1000) * 10)), x + 5 + spaceX, y + 5 + lineHeight * 1);
+    }
+    else if (tracked.state.baroAltitude*3.28084 > 10000) {
+        backbuffer.setTextColor(lgfx::color888(200, 0, 0));
+        backbuffer.drawString("FL" + String(int(((int(tracked.state.baroAltitude*3.28084) + 999) / 1000) * 10)), x + 5 + spaceX, y + 5 + lineHeight * 1);
+    }
+    else {
+        backbuffer.setTextColor(lgfx::color888(0, 80, 200));
+        backbuffer.drawString(String(int(tracked.state.baroAltitude*3.28084)) + "ft", x + 5 + spaceX, y + 5 + lineHeight * 1);
+    }
 }
 
 void AircraftManager::DrawAircraftTriangle(LGFX_Sprite& backbuffer, int x, int y, const TrackedAircraft& tracked) const
@@ -166,5 +183,20 @@ void AircraftManager::DrawAircraftTriangle(LGFX_Sprite& backbuffer, int x, int y
     const float rightX = x - dx * TRIANGLE_LENGTH * 0.5f - px * TRIANGLE_WIDTH * 0.5f;
     const float rightY = y - dy * TRIANGLE_LENGTH * 0.5f - py * TRIANGLE_WIDTH * 0.5f;
 
-    backbuffer.fillTriangle(tipX, tipY, leftX, leftY, rightX, rightY, lgfx::color888(0, 255, 0));
+// Color the triangle based on whether the aircraft is climbing, descending, or level. Use a threshold of 0.5 m/s for determining climb/descent.
+    if (tracked.state.onGround || tracked.state.baroAltitude*3.28084 <= 190 || tracked.state.geoAltitude*3.28084 <= 250) { // If the aircraft is at or below 190 feet, color it red to indicate it's near or on the ground.
+        backbuffer.fillTriangle(tipX, tipY, leftX, leftY, rightX, rightY, lgfx::color888(255, 0, 255));
+    }
+    else if (tracked.state.verticalRate <= -0.5 && !tracked.state.onGround) { // Aircraft is descending
+        backbuffer.fillTriangle(tipX, tipY, leftX, leftY, rightX, rightY, lgfx::color888(0, 255, 180));
+    }
+    else if (tracked.state.verticalRate >= 0.5 && !tracked.state.onGround) { // Aircraft is climbing
+        backbuffer.fillTriangle(tipX, tipY, leftX, leftY, rightX, rightY, lgfx::color888(255, 128, 0));
+    }
+    else { // Aircraft is flying level
+        backbuffer.fillTriangle(tipX, tipY, leftX, leftY, rightX, rightY, lgfx::color888(0, 255, 0));
+    }
+    if (tracked.state.squawk == "7500" || tracked.state.squawk == "7600" || tracked.state.squawk == "7700") { // If the aircraft has a squawk code indicating an emergency, color the triangle red to indicate an emergency situation.
+        backbuffer.drawTriangle(tipX, tipY, leftX, leftY, rightX, rightY, lgfx::color888(255, 0, 0));
+    }
 }
